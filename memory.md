@@ -44,7 +44,7 @@
 
 ### HA Long-Lived Token
 - **Stored in:** Windows Credential Manager
-- **Retrieve with:** `cmdkey /list` or via PowerShell `(Get-StoredCredential -Target "HomeAssistant").GetNetworkCredential().Password`
+- **Retrieve with:** `cmdkey /list` or via PowerShell script `C:\projects\unify-migration\scripts\get_token.ps1`
 - **Generic name:** `HomeAssistant` / user: `ha_api`
 - ⚠️ Token revoked and replaced March 14, 2026 — old token was accidentally pasted in chat
 

@@ -3,8 +3,8 @@
 
 $source = "G:\"
 $dest   = "W:\DriveArchive\G"
-$log    = "C:\projects\unigy-migration\logs\drain_g.log"
-New-Item -ItemType Directory -Path "C:\projects\unigy-migration\logs" -Force | Out-Null
+$log    = "C:\projects\unify-migration\logs\drain_g.log"
+New-Item -ItemType Directory -Path "C:\projects\unify-migration\logs" -Force | Out-Null
 New-Item -ItemType Directory -Path $dest -Force | Out-Null
 
 Write-Host "Draining G: → $dest"

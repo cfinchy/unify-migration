@@ -17,8 +17,8 @@ if ($confirm -ne "yes") { Write-Host "Aborted."; exit }
 
 New-Item -ItemType Directory -Path $dest -Force | Out-Null
 
-$log = "C:\projects\unigy-migration\logs\camera_roll_move.log"
-New-Item -ItemType Directory -Path "C:\projects\unigy-migration\logs" -Force | Out-Null
+$log = "C:\projects\unify-migration\logs\camera_roll_move.log"
+New-Item -ItemType Directory -Path "C:\projects\unify-migration\logs" -Force | Out-Null
 
 robocopy $source $dest /E /MOVE /XA:SH /LOG:$log /TEE /NP
 Write-Host "`nDone. Log at $log"

@@ -1,4 +1,4 @@
-# Unigy Migration — Remote Implementation Plan
+# Unify Migration — Remote Implementation Plan
 
 > **For Claude:** Open this repo as a VS Code workspace. Read `memory.md` first for full context,
 > then `docs/Drive_Cleanup_Log.md` for history. Execute tasks in order below. Check off each item.
