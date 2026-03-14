@@ -27,19 +27,35 @@
 - [ ] **1.2** Check C: free space — need 60+ GB for new VM. Run `scripts\check_space.ps1`
 - [ ] **1.3** If C: < 60 GB free: move Camera Roll videos (30 GB) off OneDrive — run `scripts\move_camera_roll.ps1`
 
-### Phase 2 — Create Fresh HA VM on C:
-- [ ] **2.1** Download latest HAOS VirtualBox image (.vdi) from `https://www.home-assistant.io/installation/windows`
-  - Save to `C:\VMs\HA\`
-- [ ] **2.2** In VirtualBox: create new Linux VM named `HomeAssistant-C`
-  - Type: Linux 64-bit
-  - RAM: 4096 MB
-  - Use downloaded .vdi as existing disk
-  - **CRITICAL:** Set MAC address to match old VM — run `scripts\get_old_vm_mac.ps1` first
-- [ ] **2.3** Start new VM, wait for HA to boot (~2 min)
-- [ ] **2.4** Confirm HA accessible at new VM's IP (may differ initially — check VirtualBox network)
-- [ ] **2.5** Restore the backup from `X:\HABackups` — in HA UI: Settings → Backup → restore latest
-- [ ] **2.6** After restore, confirm `https://millcreek.duckdns.org:8123` resolves to new VM
-- [ ] **2.7** Confirm SSH works: `ssh ha` (from `C:\Users\chris\.ssh\config`)
+### Phase 2 — Create Fresh HA Supervised VM on C:
+
+> ⚠️ This is **Home Assistant Supervised on Debian Bookworm** — NOT HAOS.
+> The existing VM runs Supervised. Future goal: containerize this machine (Docker/Portainer on Debian).
+
+- [x] **2.0** Confirmed old VM MAC: `08:00:27:D3:15:60`, bridged to Intel AX201 Wi-Fi
+- [x] **2.0** Confirmed today's backup `9ff1dfa6.tar` on `X:\HABackups` ✅
+- [ ] **2.1** Download Debian 12.9 Bookworm netinst ISO — run `scripts\download_debian.ps1`
+  - Saves to `C:\VMs\HA\debian-12.9.0-amd64-netinst.iso`
+- [ ] **2.2** Create new VirtualBox VM — run `scripts\create_ha_vm.ps1`
+  - Name: `HomeAssistant-C`, Debian 64-bit, 4096 MB RAM
+  - New 60 GB dynamic VDI at `C:\VMs\HA\HomeAssistant-C.vdi`
+  - **MAC: `080027D31560`** (same as old VM — keeps IP `.240` and UniFi forwards)
+  - Bridged to Intel AX201 Wi-Fi (change to Ethernet later when box is near a port)
+  - VDI can be resized later: `VBoxManage modifymedium --resize <MB>`
+- [ ] **2.3** Start VM, boot Debian installer, complete minimal install:
+  - No desktop environment
+  - SSH server ✅, standard system utilities ✅
+  - Hostname: `homeassistant`
+  - Static IP or rely on DHCP reservation at `.240`
+- [ ] **2.4** SSH into new VM, install HA Supervised:
+  ```bash
+  apt update && apt install -y curl
+  curl -sL https://raw.githubusercontent.com/home-assistant/supervised-installer/main/installer.sh | bash -s -- -m generic-x86-64
+  ```
+- [ ] **2.5** Wait for Supervisor to start (~5 min), then go to `http://10.176.1.240:8123`
+- [ ] **2.6** Restore backup: Settings → Backup → Upload `9ff1dfa6.tar` from `X:\HABackups`
+- [ ] **2.7** Confirm `https://millcreek.duckdns.org:8123` works, SSH `ssh ha` works
+- [ ] **2.8** Install Advanced SSH & Web Terminal add-on, port 22, paste `id_rsa.pub` into authorized_keys
 
 ### Phase 3 — Decommission Old VM on K:
 - [ ] **3.1** Stop old Bookworm VM in VirtualBox (right-click → Power Off)
