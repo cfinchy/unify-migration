@@ -24,16 +24,20 @@
 ## Migration Strategy: Parallel Install  Atomic Cutover
 
 **Goal:** Keep HA at `10.176.1.240` running continuously until the NEW VM is 100% verified.
-Downtime is ~30-60 seconds at the very end (cutover_vm.ps1).
+Downtime is ~60-90 seconds at the very end (`cutover_vm.ps1`).
 
 ```
 Old VM (Bookworm, K:, MAC 080027D31560, IP .240)  STAYS RUNNING  power off
-                                                                                             (30s)
-New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  IP .240 
+                                                                                        (~90s)
+New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  STATIC .240 
 ```
 
 - New VM uses **temp MAC `080027FFFFFE`** during setup  gets a random DHCP IP (not `.240`)
-- Only `cutover_vm.ps1` does the final MAC swap and IP handoff
+- `cutover_vm.ps1` does two things atomically:
+  1. **MAC swap**  UniFi DHCP hands `.240` to the new VM (same reservation, same IP, no router changes)
+  2. **Static IP**  immediately SSHs in and writes `10.176.1.240` as a static IP in `/etc/network/interfaces`
+     so `.240` is permanently owned by the new VM  independent of DHCP going forward
+- **No port forwarding changes needed**  `.240` never moves, all UniFi forwards keep working
 - **DO NOT run `cutover_vm.ps1` until new HA is fully verified at its temp IP**
 
 ---
@@ -62,8 +66,13 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  IP 
   - No desktop environment
   - SSH server , standard system utilities 
   - Hostname: `homeassistant`
-  - After first boot, find new VM's IP: check UniFi DHCP leases at `https://192.168.0.1`
-    (look for a new lease  it will NOT be `.240`, that stays on the old VM)
+  - **Note the IP** after first boot  check UniFi DHCP leases at `https://192.168.0.1`
+    (it will NOT be `.240`  that stays on the old VM)
+  - **Paste your `id_rsa.pub` into authorized_keys** during or after install so SSH works:
+    ```bash
+    mkdir -p ~/.ssh && echo "PASTE_CONTENTS_OF_C:\Users\chris\.ssh\id_rsa.pub" >> ~/.ssh/authorized_keys
+    chmod 600 ~/.ssh/authorized_keys
+    ```
 - [ ] **2.4** SSH into new VM at its temp IP, install HA Supervised:
   ```bash
   apt update && apt install -y curl
@@ -73,18 +82,26 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  IP 
 - [ ] **2.5** Wait ~5 min for Supervisor to initialize. Access at `http://<TEMP_IP>:8123`
 - [ ] **2.6** Restore backup: Settings  Backup  Upload `9ff1dfa6.tar` from `X:\HABackups`
   -  After restore, HA will restart. Wait for it to come back at `http://<TEMP_IP>:8123`
-- [ ] **2.7** Fully verify new HA at temp IP:
+- [ ] **2.7** Fully verify new HA at temp IP  take your time, days if needed, old HA still live:
   - All automations, integrations, devices visible 
-  - DuckDNS add-on configured (will need updating after cutover) 
-  - Check logs for errors 
-- [ ] **2.8** Install Advanced SSH & Web Terminal add-on, port 22, paste `id_rsa.pub`
-- [ ] **2.9**  CUTOVER  run `scripts\cutover_vm.ps1` (only when fully happy with 2.7/2.8)
-  - Stops old VM, swaps MAC to `080027D31560`, starts new VM  gets `.240`
-  - Total downtime: ~30-60 seconds
-  - Verify `https://millcreek.duckdns.org:8123` resolves after cutover
+  - DuckDNS add-on present (external URL will be wrong until cutover  that's expected) 
+  - No errors in Supervisor logs 
+- [ ] **2.8** Confirm SSH works: `ssh root@<TEMP_IP>` (using id_rsa)
+- [ ] **2.9**  CUTOVER  run only when fully satisfied with 2.7/2.8:
+  ```powershell
+  .\scripts\cutover_vm.ps1 -TempIP <NEW_VM_TEMP_IP>
+  ```
+  The script will:
+  - Verify SSH works to new VM before touching anything
+  - Stop old Bookworm VM
+  - Swap new VM MAC  `080027D31560`  UniFi DHCP hands it `10.176.1.240`
+  - Start new VM, wait for HA to respond
+  - SSH in and write `/etc/network/interfaces` with **static IP `10.176.1.240`**
+  - After this: `.240` is permanent  no DHCP dependency, no port forward changes ever needed
+  - Total downtime: ~60-90 seconds
 
 ### Phase 3  Decommission Old VM on K: (AFTER cutover confirmed working)
-- [ ] **3.1** Confirm new VM running stably at `.240` for at least 1 hour
+- [ ] **3.1** Confirm new VM running stably at `.240` for at least 1 hour post-cutover
 - [ ] **3.2** Remove old Bookworm VM from VirtualBox registry: `scripts\remove_old_vm.ps1`
 - [ ] **3.3** Delete `K:\DebianVm\Bookworm\`  frees ~1.6 TB on K:
   - Run `scripts\delete_bookworm.ps1`
@@ -125,19 +142,19 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  IP 
 |---|---|
 | HA Token | Windows Credential Manager: `[CM]::Get("HomeAssistant")`  see `scripts\get_token.ps1` |
 | HA Web UI (live) | https://millcreek.duckdns.org:8123 |
-| HA Web UI (new VM, temp) | http://<TEMP_IP>:8123  check UniFi DHCP for lease |
-| HA SSH | `ssh ha` (config in `C:\Users\chris\.ssh\config`) |
+| HA Web UI (new VM, temp) | `http://<TEMP_IP>:8123`  check UniFi DHCP leases at https://192.168.0.1 |
+| HA SSH (post-cutover) | `ssh ha` (Host ha = 10.176.1.240 in `C:\Users\chris\.ssh\config`) |
 | NAS Web UI | https://192.168.0.124/unifi-drive |
 | NAS SMB | W: = Personal-Drive, X: = HABackups, Y: = FinchFamilyRoku |
 | VirtualBox | `C:\Program Files\Oracle\VirtualBox\VBoxManage.exe` |
-| UniFi DHCP leases | https://192.168.0.1 (to find new VM's temp IP) |
 
 ---
 
 ## Important Constraints
 
 - **DO NOT change the MAC on old Bookworm VM**  it must keep `.240` until cutover
-- **DO NOT run cutover_vm.ps1 early**  only after new HA fully verified at temp IP
-- **DO NOT delete K:\DebianVm\Bookworm until new VM confirmed working at .240** (Phase 3.1)
-- **UniFi port forwards depend on `10.176.1.240`**  preserved automatically by cutover MAC swap
+- **DO NOT run `cutover_vm.ps1` early**  only after new HA fully verified at temp IP
+- **DO NOT delete `K:\DebianVm\Bookworm` until new VM confirmed working at `.240`** (Phase 3.1)
+- **No port forwarding changes needed**  `.240` never moves (MAC swap + static IP in cutover script)
+- After cutover, `.240` is a **static IP on the Debian VM**  DHCP reservation can be left or deleted
 - Windows Explorer instability noted  if Explorer crashes during file operations, reconnect remotely
