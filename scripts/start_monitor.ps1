@@ -25,9 +25,11 @@ $Action = New-ScheduledTaskAction -Execute "powershell.exe" `
     -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Script`""
 
 # Trigger: every 30 minutes, starting 1 minute from now, running indefinitely
+# Note: [TimeSpan]::MaxValue overflows the Task Scheduler XML parser — set Duration
+# to "" via the repetition object, which Task Scheduler interprets as "no end".
 $Trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
-    -RepetitionInterval  (New-TimeSpan -Minutes 30) `
-    -RepetitionDuration  ([TimeSpan]::MaxValue)
+    -RepetitionInterval (New-TimeSpan -Minutes 30)
+$Trigger.Repetition.Duration = ""    # empty = run indefinitely
 
 $Settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit  (New-TimeSpan -Minutes 10) `
