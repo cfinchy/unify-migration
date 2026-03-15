@@ -2,16 +2,9 @@
 # Runs monitor_drain.ps1 every 30 minutes, completely independent of SSH.
 # Run this once to set up; re-run to reset/update.
 #
-# Prerequisites for Telegram alerts (optional but recommended):
-#   1. Create a HA long-lived token:
-#      HA UI -> bottom-left avatar -> Security -> Long-lived access tokens -> Create
-#      Save the token to: C:\projects\unify-migration\ha.token (one line)
-#   2. Find your Telegram notify service name:
-#      HA UI -> Developer Tools -> Services -> search "notify"
-#      Edit monitor_drain.ps1 line: $NotifyService = "telegram_bot"  <- update this
-#
-# Without ha.token: monitor still runs and logs to logs\monitor.log
-# With ha.token:    alerts sent to Telegram + logged
+# Alerts go to HA Companion App (mobile_app_iphone_chris_2) via Millcreek HA REST API.
+# Requires: C:\projects\unify-migration\ha.token  (Millcreek HA long-lived token)
+# Without ha.token: monitor still runs and writes to logs\monitor.log only
 
 $ProjectDir = "C:\projects\unify-migration"
 $TaskName   = "UnifyMigration-Monitor"
@@ -51,16 +44,12 @@ Write-Host "Script   : $Script"
 Write-Host "Schedule : every 30 minutes"
 Write-Host "Status   : $status"
 Write-Host ""
-Write-Host "--- Next steps for Telegram alerts ---" -ForegroundColor Yellow
-Write-Host "  1. Create HA long-lived token and save to:"
-Write-Host "     C:\projects\unify-migration\ha.token"
-Write-Host "     (HA UI -> avatar bottom-left -> Security -> Long-lived access tokens)"
+Write-Host "--- Alert configuration ---" -ForegroundColor Yellow
+Write-Host "  Token  : C:\projects\unify-migration\ha.token  (Millcreek HA long-lived token)"
+Write-Host "  Notify : mobile_app_iphone_chris_2  (HA Companion App push notification)"
 Write-Host ""
-Write-Host "  2. Verify notify service name in monitor_drain.ps1:"
-Write-Host "     `$NotifyService = `"telegram_bot`"  <- check HA Dev Tools > Services > search notify"
-Write-Host ""
-Write-Host "  Without ha.token: alerts logged to $MonitorLog only"
-Write-Host "  With ha.token   : Telegram message sent on any problem or completion"
+Write-Host "  Without ha.token : alerts logged to $MonitorLog only"
+Write-Host "  With ha.token    : push notification sent on any problem or completion"
 Write-Host ""
 Write-Host "Monitor log : $MonitorLog"
 Write-Host "To run now  : powershell -ExecutionPolicy Bypass -File $Script"
