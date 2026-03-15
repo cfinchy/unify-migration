@@ -1,11 +1,10 @@
 # monitor_drain.ps1 - Periodic health check for all drain tasks
 # Runs every 30 min via Task Scheduler (registered by start_monitor.ps1)
-# Sends push notification via HA mobile app on any problem or completion
+# Sends push notification via home HA on any problem, completion, or daily summary
 # Always writes to logs\monitor.log regardless of alert state
 #
 # Requires:
-#   C:\projects\unify-migration\ha.token  (Millcreek HA long-lived token, gitignored)
-#   $HaUrl and $NotifyService matching your HA instance
+#   C:\projects\unify-migration\ha.token  (home HA GPS logger token, gitignored)
 
 $ProjectDir    = "C:\projects\unify-migration"
 $LogDir        = "$ProjectDir\logs"
@@ -13,7 +12,7 @@ $StateFile     = "$LogDir\monitor_state.json"
 $MonitorLog    = "$LogDir\monitor.log"
 $TokenFile     = "$ProjectDir\ha.token"
 $HaUrl         = "https://ha.fnchysan.uk"          # Home HA (stable instance, same as network reports)
-$NotifyService = "mobile_app_iphone_caf"          # same service used by Network Daily Report
+$NotifyService = "mobile_app_iphone_caf"            # same service used by Network Daily Report
 
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 
@@ -28,6 +27,7 @@ $defaultState = [PSCustomObject]@{
     G = [PSCustomObject]@{ ErrorCount=0; AlertedStall=$false; AlertedStop=$false; Completed=$false }
     H = [PSCustomObject]@{ ErrorCount=0; AlertedStall=$false; AlertedStop=$false; Completed=$false }
     K = [PSCustomObject]@{ ErrorCount=0; AlertedStall=$false; AlertedStop=$false; Completed=$false }
+    LastDailyReport = $null
 }
 if (-not $isFirstRun) {
     try   { $state = Get-Content $StateFile -Raw | ConvertFrom-Json }
@@ -43,6 +43,38 @@ $Drains = @(
 
 $alerts  = New-Object System.Collections.Generic.List[string]
 $okLines = New-Object System.Collections.Generic.List[string]
+
+# ---------------------------------------------------------------------------
+# Helper: parse bytes copied from the last robocopy summary block in a log
+# Robocopy summary format: "   Bytes :  4.192 g    1.500 g    ..."
+#                           columns:    Total      Copied     Skipped ...
+# Returns string like "1.50 GB / 4192 GB (36%)" or "" if not parseable
+# ---------------------------------------------------------------------------
+function Get-DrainProgress {
+    param([string]$LogPath, [int]$TotalGB)
+    if (-not (Test-Path $LogPath)) { return "" }
+    $lines       = Get-Content $LogPath -ErrorAction SilentlyContinue
+    $bytesSummary = $lines | Where-Object { $_ -match "^\s+Bytes\s*:" } | Select-Object -Last 1
+    if (-not $bytesSummary) { return "" }
+
+    # Extract two numeric fields after "Bytes :" — total and copied
+    $vals = [regex]::Matches($bytesSummary, '([\d\.]+)\s*([gGmMkK]?)')
+    if ($vals.Count -lt 2) { return "" }
+
+    function To-GB { param($val, $unit)
+        switch ($unit.ToLower()) {
+            "g" { [double]$val }
+            "m" { [double]$val / 1024 }
+            "k" { [double]$val / 1048576 }
+            default { [double]$val / 1073741824 }
+        }
+    }
+
+    $copiedGB = To-GB $vals[1].Groups[1].Value $vals[1].Groups[2].Value
+    $copiedGB = [math]::Round($copiedGB, 1)
+    $pct      = if ($TotalGB -gt 0) { [math]::Round($copiedGB / $TotalGB * 100, 0) } else { 0 }
+    return "${copiedGB} GB / ${TotalGB} GB (${pct}%)"
+}
 
 # ---------------------------------------------------------------------------
 # NAS reachability
@@ -81,7 +113,6 @@ foreach ($d in $Drains) {
     # Task finished (Ready = not running right now)
     if ($taskState -eq "Ready" -and $exitCode -ne $null) {
         if ($exitCode -le 7) {
-            # Robocopy exit 0=no change, 1=files copied, 2=extra files, 3=both, etc — all OK
             if (-not $isFirstRun) {
                 $alerts.Add("SUCCESS: Drive $drv drain COMPLETED (robocopy exit $exitCode) - verify NAS then check off in PLAN.md")
             }
@@ -104,14 +135,13 @@ foreach ($d in $Drains) {
         $logSizeKB   = [math]::Round($item.Length / 1KB, 0)
 
         # Stall detection: >24h without log update while task claims to be Running
-        # (24h threshold because robocopy with /Z can be silent during a very large file)
         if ($hoursSince -gt 24 -and $taskState -eq "Running") {
             if (-not $s.AlertedStall -and -not $isFirstRun) {
                 $alerts.Add("WARNING: Drive $drv log not updated for ${hoursSince}h - possible stall or very large file")
                 $s.AlertedStall = $true
             }
         } elseif ($hoursSince -lt 6) {
-            $s.AlertedStall = $false   # clear stall flag once log resumes updating
+            $s.AlertedStall = $false
         }
 
         # New errors since last check
@@ -119,9 +149,9 @@ foreach ($d in $Drains) {
         $errorCount = ($allLines | Where-Object { $_ -match " ERROR | FAILED " }).Count
         $prevErrors = [int]$s.ErrorCount
         if ($errorCount -gt $prevErrors -and -not $isFirstRun) {
-            $delta       = $errorCount - $prevErrors
-            $recentErrs  = $allLines | Where-Object { $_ -match " ERROR | FAILED " } | Select-Object -Last 2
-            $errSample   = ($recentErrs | ForEach-Object { "  $_" }) -join "`n"
+            $delta      = $errorCount - $prevErrors
+            $recentErrs = $allLines | Where-Object { $_ -match " ERROR | FAILED " } | Select-Object -Last 2
+            $errSample  = ($recentErrs | ForEach-Object { "  $_" }) -join "`n"
             $alerts.Add("WARNING: Drive $drv has $delta new error line(s) (total $errorCount):`n$errSample")
         }
         $s.ErrorCount = $errorCount
@@ -145,42 +175,94 @@ if ($isFirstRun) {
 } elseif ($alerts.Count -eq 0) {
     $logLine = "$timestamp | OK | " + ($okLines -join " | ")
 } else {
-    $logLine = "$timestamp | ALERTS(${alerts.Count}) | " + ($alerts -join " ; ")
+    $logLine = "$timestamp | ALERTS($($alerts.Count)) | " + ($alerts -join " ; ")
 }
 Add-Content $MonitorLog $logLine
 
 # ---------------------------------------------------------------------------
-# Send Telegram alert via HA REST API
+# Helper: send a push notification
+# ---------------------------------------------------------------------------
+function Send-Notification {
+    param([string]$Message)
+    $token   = (Get-Content $TokenFile -Raw).Trim()
+    $payload = @{ message = $Message } | ConvertTo-Json -Compress
+    $headers = @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" }
+    Invoke-RestMethod -Uri "$HaUrl/api/services/notify/$NotifyService" `
+        -Method Post -Headers $headers -Body $payload -TimeoutSec 15 | Out-Null
+}
+
+# ---------------------------------------------------------------------------
+# Alert notification (problems / completion)
 # ---------------------------------------------------------------------------
 if ($alerts.Count -gt 0 -and -not $isFirstRun -and (Test-Path $TokenFile)) {
-    $token   = (Get-Content $TokenFile -Raw).Trim()
-    $msgBody = "Millcreek Drain Alert $timestamp`n"
-    $msgBody += ($alerts -join "`n") + "`n"
-    $msgBody += "---`n" + ($okLines -join "`n")
-
-    $payload = @{ message = $msgBody } | ConvertTo-Json -Compress
-    $headers = @{
-        Authorization  = "Bearer $token"
-        "Content-Type" = "application/json"
-    }
+    $msg  = "Millcreek Drain Alert $timestamp`n"
+    $msg += ($alerts -join "`n") + "`n---`n" + ($okLines -join "`n")
     try {
-        Invoke-RestMethod -Uri "$HaUrl/api/services/notify/$NotifyService" `
-            -Method Post -Headers $headers -Body $payload -TimeoutSec 15 | Out-Null
-        Add-Content $MonitorLog "$timestamp | Telegram sent OK"
+        Send-Notification $msg
+        Add-Content $MonitorLog "$timestamp | Alert notification sent"
     } catch {
-        Add-Content $MonitorLog "$timestamp | Telegram FAILED: $_"
-        # Also write alert to a visible file as fallback
+        Add-Content $MonitorLog "$timestamp | Alert notification FAILED: $_"
         $fallback = "$LogDir\drain_alert.txt"
         "=== UNSENT ALERT $timestamp ===" | Set-Content $fallback
         $alerts | Add-Content $fallback
-        Add-Content $MonitorLog "$timestamp | Fallback alert written to $fallback"
     }
 } elseif ($alerts.Count -gt 0 -and -not $isFirstRun -and -not (Test-Path $TokenFile)) {
-    # No token - write visible alert file so SSH check will surface it
     $fallback = "$LogDir\drain_alert.txt"
-    "=== ALERT (no ha.token - Telegram not configured) $timestamp ===" | Set-Content $fallback
+    "=== ALERT (no ha.token) $timestamp ===" | Set-Content $fallback
     $alerts | Add-Content $fallback
     Add-Content $MonitorLog "$timestamp | Alert written to $fallback (ha.token missing)"
+}
+
+# ---------------------------------------------------------------------------
+# Daily progress report (once per 24h regardless of alert status)
+# ---------------------------------------------------------------------------
+$lastReport   = if ($state.PSObject.Properties['LastDailyReport'] -and $state.LastDailyReport) {
+                    [DateTime]$state.LastDailyReport
+                } else { [DateTime]::MinValue }
+$hoursSinceDR = ((Get-Date) - $lastReport).TotalHours
+$sendDaily    = (-not $isFirstRun) -and ($hoursSinceDR -ge 24) -and (Test-Path $TokenFile)
+
+if ($sendDaily) {
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("Millcreek Drain Progress — $timestamp")
+    $lines.Add("")
+
+    foreach ($d in $Drains) {
+        $drv = $d.Drive
+        $s   = $state.$drv
+
+        if ($s.Completed) {
+            $lines.Add("Drive $drv : Completed")
+            continue
+        }
+
+        $task      = Get-ScheduledTask -TaskName $d.Task -ErrorAction SilentlyContinue
+        $taskState = if ($task) { $task.State } else { "MISSING" }
+
+        if (Test-Path $d.Log) {
+            $item       = Get-Item $d.Log
+            $hoursSince = [math]::Round(((Get-Date) - $item.LastWriteTime).TotalHours, 1)
+            $logSizeMB  = [math]::Round($item.Length / 1MB, 1)
+            $progress   = Get-DrainProgress $d.Log $d.TotalGB
+            $errCount   = [int]$s.ErrorCount
+            $errStr     = if ($errCount -gt 0) { " | $errCount errors" } else { "" }
+            $progressStr = if ($progress) { " | $progress" } else { " | log ${logSizeMB}MB" }
+            $lines.Add("Drive $drv : $taskState${progressStr} | updated ${hoursSince}h ago${errStr}")
+        } else {
+            $lines.Add("Drive $drv : $taskState (no log yet)")
+        }
+    }
+
+    $lines.Add("")
+    $lines.Add("NAS: $(if ($nasOk) { 'OK' } else { 'UNREACHABLE' }) | robocopy processes: $rcCount")
+
+    try {
+        Send-Notification ($lines -join "`n")
+        $state | Add-Member -Force -NotePropertyName LastDailyReport -NotePropertyValue (Get-Date -Format "o")
+        Add-Content $MonitorLog "$timestamp | Daily report sent"
+    } catch {
+        Add-Content $MonitorLog "$timestamp | Daily report FAILED: $_"
+    }
 }
 
 # ---------------------------------------------------------------------------
