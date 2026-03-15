@@ -12,8 +12,8 @@ $LogDir        = "$ProjectDir\logs"
 $StateFile     = "$LogDir\monitor_state.json"
 $MonitorLog    = "$LogDir\monitor.log"
 $TokenFile     = "$ProjectDir\ha.token"
-$HaUrl         = "https://millcreek.duckdns.org"  # Millcreek HA (same LAN as Windows box)
-$NotifyService = "mobile_app_iphone_chris_2"  # HA Companion App push notification
+$HaUrl         = "https://ha.fnchysan.uk"          # Home HA (stable instance, same as network reports)
+$NotifyService = "mobile_app_iphone_caf"          # same service used by Network Daily Report
 
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 
