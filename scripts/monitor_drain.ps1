@@ -16,7 +16,7 @@ $LogDir        = "$ProjectDir\logs"
 $StateFile     = "$LogDir\monitor_state.json"
 $MonitorLog    = "$LogDir\monitor.log"
 $TokenFile     = "$ProjectDir\ha.token"
-$HaUrl         = "http://192.168.0.98:8123"   # local HA (same LAN as Windows box)
+$HaUrl         = "https://millcreek.duckdns.org"  # Millcreek HA (same LAN as Windows box)
 $NotifyService = "telegram_bot"               # CHANGE THIS to match your HA service name
 
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
