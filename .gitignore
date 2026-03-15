@@ -1,3 +1,4 @@
 # .gitignore for unigy-migration repo
 logs/
 *.log
+nas.creds

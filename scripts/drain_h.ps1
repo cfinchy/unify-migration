@@ -1,6 +1,8 @@
 # Drain H: to NAS W:\DriveArchive\H\
 # PLAN.md Step R3
 
+. "$PSScriptRoot\mount_nas.ps1"; Mount-Nas   # mounts W: and X: from nas.creds if not already mapped
+
 $source = "H:\"
 $dest   = "W:\DriveArchive\H"
 $log    = "C:\projects\unify-migration\logs\drain_h.log"

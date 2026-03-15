@@ -3,6 +3,8 @@
 # Safe to run while HA VM is live on K: — K:\DebianVm\ is excluded via /XD
 # K:\DebianVm\ will be deleted later in Phase 3 (delete_bookworm.ps1) at physical visit
 
+. "$PSScriptRoot\mount_nas.ps1"; Mount-Nas   # mounts W: and X: from nas.creds if not already mapped
+
 $source = "K:\"
 $dest   = "W:\K backup millcreek"   # pre-existing manual backup — robocopy delta-syncs only new/changed files
 $log    = "C:\projects\unify-migration\logs\drain_k.log"
