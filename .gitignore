@@ -1,4 +1,5 @@
-# .gitignore for unigy-migration repo
+# .gitignore for unify-migration repo
 logs/
 *.log
 nas.creds
+ha.token
