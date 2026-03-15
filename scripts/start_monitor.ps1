@@ -2,8 +2,9 @@
 # Runs monitor_drain.ps1 every 30 minutes, completely independent of SSH.
 # Run this once to set up; re-run to reset/update.
 #
-# Alerts go to HA Companion App (mobile_app_iphone_chris_2) via Millcreek HA REST API.
-# Requires: C:\projects\unify-migration\ha.token  (Millcreek HA long-lived token)
+# Alerts go to home HA (ha.fnchysan.uk) via mobile_app_iphone_caf —
+# same path as the Network Daily Report.
+# Requires: C:\projects\unify-migration\ha.token  (home HA GPS logger token)
 # Without ha.token: monitor still runs and writes to logs\monitor.log only
 
 $ProjectDir = "C:\projects\unify-migration"
@@ -45,8 +46,9 @@ Write-Host "Schedule : every 30 minutes"
 Write-Host "Status   : $status"
 Write-Host ""
 Write-Host "--- Alert configuration ---" -ForegroundColor Yellow
-Write-Host "  Token  : C:\projects\unify-migration\ha.token  (Millcreek HA long-lived token)"
-Write-Host "  Notify : mobile_app_iphone_chris_2  (HA Companion App push notification)"
+Write-Host "  Token  : C:\projects\unify-migration\ha.token  (home HA GPS logger token)"
+Write-Host "  HA URL : https://ha.fnchysan.uk"
+Write-Host "  Notify : mobile_app_iphone_caf  (same as Network Daily Report)"
 Write-Host ""
 Write-Host "  Without ha.token : alerts logged to $MonitorLog only"
 Write-Host "  With ha.token    : push notification sent on any problem or completion"
