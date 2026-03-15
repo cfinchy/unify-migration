@@ -1,15 +1,11 @@
 # monitor_drain.ps1 - Periodic health check for all drain tasks
 # Runs every 30 min via Task Scheduler (registered by start_monitor.ps1)
-# Sends Telegram alert via HA REST API on any problem or completion
+# Sends push notification via HA mobile app on any problem or completion
 # Always writes to logs\monitor.log regardless of alert state
 #
-# Requires for Telegram alerts:
-#   C:\projects\unify-migration\ha.token  (one line, gitignored)
-#   $NotifyService set to your HA notify service name (see below)
-#
-# To find your HA notify service name:
-#   HA UI -> Developer Tools -> Services -> search "notify"
-#   Likely "notify.telegram_bot" or "notify.mobile_app_<yourphone>"
+# Requires:
+#   C:\projects\unify-migration\ha.token  (Millcreek HA long-lived token, gitignored)
+#   $HaUrl and $NotifyService matching your HA instance
 
 $ProjectDir    = "C:\projects\unify-migration"
 $LogDir        = "$ProjectDir\logs"
@@ -17,7 +13,7 @@ $StateFile     = "$LogDir\monitor_state.json"
 $MonitorLog    = "$LogDir\monitor.log"
 $TokenFile     = "$ProjectDir\ha.token"
 $HaUrl         = "https://millcreek.duckdns.org"  # Millcreek HA (same LAN as Windows box)
-$NotifyService = "telegram_bot"               # CHANGE THIS to match your HA service name
+$NotifyService = "mobile_app_iphone_chris_2"  # HA Companion App push notification
 
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 
