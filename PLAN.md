@@ -87,45 +87,43 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  STA
   ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_space.ps1"
   ```
 
-- [ ] **R3** — Drain H: → NAS (safest first — H: has Jan 2026 copies of K: data, mostly redundant):
-  ```bash
-  # Script has interactive confirmation prompt — requires -t for pseudo-TTY
-  ssh -t millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\drain_h.ps1"
-  ```
-  For long transfers, run as a background PS job to survive SSH disconnection:
-  ```bash
-  ssh millcreek-win "powershell -Command \"Start-Job -ScriptBlock { & 'C:\projects\unify-migration\scripts\drain_h.ps1' } | Out-Null\""
-  # Check job status later:
-  ssh millcreek-win "powershell -Command \"Get-Job | Select-Object Id,State,HasMoreData\""
-  # Read log:
-  ssh millcreek-win "powershell -Command \"Get-Content C:\projects\unify-migration\logs\drain_h.log -Tail 30\""
-  ```
-  ⚠️ Do NOT eject H: or delete source until NAS copy verified from home (Step R6).
+  > **Transfer speed**: ~1.93 MB/s (15.4 Mbps — Millcreek ISP upload is the bottleneck).
+  > Estimates: H: ~21 days, G: ~26 days, K: delta ~17 days (less if many files already in NAS backup).
+  > Drains run as Windows Scheduled Tasks — completely independent of SSH sessions.
+  > Robocopy skips already-copied files on restart, so any interruption is safe to resume.
+  > **Recommended order**: G: first (longest, start immediately), then H:, then K:.
 
-- [ ] **R4** — Drain G: → NAS (G: contains a Bullseye DebianVM — drain_g.ps1 copies it all, which is correct):
+- [ ] **R3** — Start G: drain first (longest — ~26 days, start immediately):
   ```bash
-  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\drain_g.ps1"
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\start_drain.ps1 -Drive G"
   ```
-  ⚠️ Do NOT eject G: or delete local copy until verified on NAS from home (Step R6).
 
-- [ ] **R5** — Drain K: partial → NAS (excludes `K:\DebianVm\` — safe while HA is live):
+- [ ] **R4** — Start H: drain (can run after G: completes, or earlier if bandwidth allows):
   ```bash
-  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\drain_k.ps1"
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\start_drain.ps1 -Drive H"
   ```
-  `drain_k.ps1` now targets `W:\K backup millcreek` (pre-existing manual backup) instead of a
-  new `DriveArchive\K`. Robocopy delta-syncs — only new/changed files cross the WAN. The `/XO`
-  flag prevents overwriting newer NAS files with potentially CRC-damaged K: data.
+  H: drain includes `H:\old HA backups` and `H:\pcpcpcDownloads` — both are duplicates of data
+  already in `K backup millcreek` on the NAS, but we copy anyway for completeness.
+
+- [ ] **R5** — Start K: drain (excludes `K:\DebianVm\` — safe while HA is live):
+  ```bash
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\start_drain.ps1 -Drive K"
+  ```
+  K: delta-syncs to `\\NAS\Personal-Drive\K backup millcreek` — only new/changed files transferred.
+  `/XO` flag prevents overwriting newer NAS copies with CRC-damaged K: source files.
   **Do NOT eject K:** — the running HA VM lives at `K:\DebianVm\Bookworm\`. K: stays until Phase 3.
 
-- [ ] **R6** — Verify drain completeness from home Proxmox VM (fast local NAS I/O, no WAN):
+- [ ] **R6** — Check drain progress (run from home at any time — zero effect on the drain):
   ```bash
-  # NAS W: = /mnt/nas/Personal-Drive on VM 102 (already in fstab)
-  ls /mnt/nas/Personal-Drive/DriveArchive/
-  # Check robocopy logs for errors (exit code > 7 = real errors, ≤ 1 = success)
-  # Files are at: C:\projects\unify-migration\logs\drain_*.log on Windows box
-  ssh millcreek-win "powershell -Command \"Get-Content C:\projects\unify-migration\logs\drain_h.log -Tail 20\""
-  ssh millcreek-win "powershell -Command \"Get-Content C:\projects\unify-migration\logs\drain_g.log -Tail 20\""
-  ssh millcreek-win "powershell -Command \"Get-Content C:\projects\unify-migration\logs\drain_k.log -Tail 20\""
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_drain.ps1"
+  ```
+  Shows: Task Scheduler state, robocopy log tail, files/bytes copied, errors, active processes.
+  To tail a log live: `ssh millcreek-win "powershell -Command \"Get-Content C:\projects\unify-migration\logs\drain_g.log -Wait -Tail 20\""`
+
+  Verify on NAS from home after each drive completes:
+  ```bash
+  ls /mnt/nas/Personal-Drive/DriveArchive/    # G: and H: destinations
+  ls /mnt/nas/Personal-Drive/K\ backup\ millcreek/   # K: destination
   ```
 
 - [ ] **R7** — Monitor HA health weekly (repeat throughout 4-week window):
