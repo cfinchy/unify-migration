@@ -24,22 +24,23 @@ $elapsed = Measure-Command {
     robocopy $dir "W:\SpeedTest" $fname /COPYALL /R:1 /W:1 /NP
 }
 
-$secs      = [math]::Round($elapsed.TotalSeconds, 1)
-$speedMBps = [math]::Round($sizeMB / $elapsed.TotalSeconds, 2)
-$speedMbps = [math]::Round($speedMBps * 8, 1)
+$secs        = [math]::Round($elapsed.TotalSeconds, 1)
+$speed_MBs   = [math]::Round($sizeMB / $elapsed.TotalSeconds, 2)   # MB/s
+$speed_Mbps  = [math]::Round($speed_MBs * 8, 1)                    # Megabits/s
 
 Write-Host "=== Result ==="
 Write-Host "Time   : $secs seconds"
-Write-Host "Speed  : $speedMBps MB/s  ($speedMbps Mbps)"
+Write-Host "Speed  : $speed_MBs MB/s  ($speed_Mbps Mbps)"
 Write-Host ""
-Write-Host "=== Drain Time Estimates ==="
+Write-Host "=== Drain Time Estimates (at $speed_MBs MB/s) ==="
 @(
-    [PSCustomObject]@{ Label="H: full drain  (~3,358 GB)";   GB=3358 },
-    [PSCustomObject]@{ Label="G: full drain  (~4,192 GB)";   GB=4192 },
+    [PSCustomObject]@{ Label="H: full drain  (~3,358 GB)";     GB=3358 },
+    [PSCustomObject]@{ Label="G: full drain  (~4,192 GB)";     GB=4192 },
     [PSCustomObject]@{ Label="K: delta sync  (~2,700 GB new)"; GB=2700 }
 ) | ForEach-Object {
-    $hrs = [math]::Round(($_.GB * 1024) / $speedMBps / 3600, 1)
-    Write-Host ("  " + $_.Label + " : ~$hrs hours at current speed")
+    $hrs  = [math]::Round(($_.GB * 1024) / $speed_MBs / 3600, 1)
+    $days = [math]::Round($hrs / 24, 1)
+    Write-Host ("  " + $_.Label + " : ~$hrs hours (~$days days) unattended")
 }
 
 Write-Host ""
