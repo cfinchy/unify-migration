@@ -1,5 +1,5 @@
 # Drain G: to NAS W:\DriveArchive\G\
-# PLAN.md Step 6.2
+# PLAN.md Step R4
 
 $source = "G:\"
 $dest   = "W:\DriveArchive\G"

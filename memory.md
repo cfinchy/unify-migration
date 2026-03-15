@@ -14,6 +14,14 @@
 
 ## System Overview
 
+- **Architecture:**
+  ```
+  Internet → Optimum CPE (67.83.47.235) → UDMSE WAN (192.168.1.209) → LAN (10.176.1.0/24)
+    └─ Windows box (10.176.1.110) — VirtualBox hypervisor
+         └─ Debian VM (Bookworm, currently on K:) — HA Supervised (Docker)
+              └─ IP: 10.176.1.240, reachable externally on 443/8123
+  ```
+- **Double-NAT:** Optimum CPE only forwards 443, 8123, 32400 to UDMSE. Port 22 (NasPro SSH) and 2222 (Windows SSH) require CPE forwards too — 2222 added. SSH to Debian VM must go via Windows box (`ProxyJump millcreek-win`).
 - **Machine:** Unigy box, Windows, on `10.176.1.0/24` LAN
 - **Router:** UniFi Dream Machine Special Edition
 - **WAN IP:** 192.168.1.209 (Optimum Online)
@@ -69,6 +77,76 @@ Host nas
 - **SSH key:** `C:\Users\chris\.ssh\id_rsa` (RSA 4096, created Dec 2024)
 - **NAS SSH:** Root login disabled on UniFi Drive — file transfers use SMB (W:/X:/Y: already mapped) ✅
 - **HA SSH add-on:** Needs installing (Advanced SSH & Web Terminal, port 22)
+
+---
+
+## Remote Access (Working from Home)
+
+**Current working context:** Home Proxmox VM → internet → Millcreek
+
+### Step 1: Find the Windows box IP
+Connect via RealVNC (cloud relay — no port forward needed), open PowerShell:
+```powershell
+(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -like "10.176.*"}).IPAddress
+```
+Or log into unifi.ui.com → Network → Clients → find the Windows hostname.
+
+### Step 2: Enable Windows OpenSSH Server (one-time, done at Millcreek or via RDP)
+On the Windows box (PowerShell as Admin):
+```powershell
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+Start-Service sshd
+Set-Service -Name sshd -StartupType Automatic
+# Allow SSH through Windows Firewall (may already be done)
+New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
+```
+
+### Step 3: Add port forward on UniFi UDMSE
+Via unifi.ui.com → Network → Firewall & Security → Port Forwarding:
+- Name: `Windows SSH`
+- Protocol: TCP
+- External Port: 2222 (avoids conflict with existing ext:22 → HA)
+- Internal IP: `10.176.1.110`
+- Internal Port: 22
+
+### Step 4: Copy SSH public key to Windows box
+From home Proxmox VM:
+```bash
+ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 chris@millcreek.duckdns.org
+# or manually: cat ~/.ssh/id_ed25519.pub | ssh -p 2222 chris@millcreek.duckdns.org \
+#   "New-Item -Force -Path C:\Users\chris\.ssh; Add-Content C:\Users\chris\.ssh\authorized_keys -Value \$input"
+```
+
+### Step 5: Add to ~/.ssh/config on Proxmox VM (DONE)
+```
+Host millcreek-win
+  HostName millcreek.duckdns.org
+  Port 2222
+  User chris
+  IdentityFile ~/.ssh/id_ed25519
+```
+- **Windows hostname:** `DESKTOP-879JK9R`
+- **Windows user:** `desktop-879jk9r\chris`
+- **Key auth working** — ed25519 via `administrators_authorized_keys`
+- **sshd_config fix:** `Match Group administrators` block had literal `\r\n` — rewritten cleanly
+
+### Running scripts remotely
+```bash
+# Run any PS script on the Windows box
+ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_space.ps1"
+
+# Interactive scripts (cutover, delete_bookworm — require typed confirmations)
+ssh -t millcreek-win "powershell -ExecutionPolicy Bypass -NoExit"
+# then paste commands interactively
+
+# Tunnel VRDE for VirtualBox GUI (needed for Debian installer — see PLAN.md Phase 2.3)
+ssh -L 5555:localhost:5555 millcreek-win
+# then connect Remmina/rdesktop to localhost:5555
+```
+
+### Checking UniFi DHCP leases remotely
+Use unifi.ui.com (cloud) instead of https://192.168.0.1 (LAN-only).
+Or via HA REST API — check `device_tracker` states for new DHCP clients.
 
 ---
 

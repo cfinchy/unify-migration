@@ -1,6 +1,7 @@
 # Drain K: unique data to NAS W:\DriveArchive\K\
-# PLAN.md Step 4.3
-# Run AFTER delete_bookworm.ps1 and after confirming H: already has the Jan 2026 copies
+# PLAN.md Step R5
+# Safe to run while HA VM is live on K: — K:\DebianVm\ is excluded via /XD
+# K:\DebianVm\ will be deleted later in Phase 3 (delete_bookworm.ps1) at physical visit
 
 $source = "K:\"
 $dest   = "W:\DriveArchive\K"
