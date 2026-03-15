@@ -75,7 +75,7 @@ $Settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Days 60) `
     -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 5) `
-    -RunOnlyIfNetworkAvailable $true
+    -RunOnlyIfNetworkAvailable
 
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Settings $Settings `
     -RunLevel Highest -Force | Out-Null
