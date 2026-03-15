@@ -14,12 +14,13 @@ Write-Host "Draining K: → $dest  (delta sync — only new/changed files copied
 Write-Host "Excluding K:\DebianVm (HA VM still running there — freed in Phase 3)"
 Write-Host "Log: $log"
 
-# /E = all subdirs, /COPY:DAT = Data+Attributes+Timestamps (no NTFS security - Samba NAS doesn't support it)
+# /E = all subdirs, /COPY:DAT /DCOPY:DAT = Data+Attributes+Timestamps for files AND dirs
+#       (no NTFS security - Samba NAS rejects it with ERROR 1314)
 # /Z = resume partial file transfers, /R:2 = retry twice, /W:5 = wait 5s
 # /XO = exclude older - do not overwrite NAS files that are newer than K: source
 #       (protects against K: CRC-corrupted or missing files overwriting good NAS copies)
 # /XD = exclude DebianVm (running HA VM) and System Volume Information
-robocopy $source $dest /E /COPY:DAT /Z /R:2 /W:5 /XO /XD "K:\DebianVm" "K:\System Volume Information" /LOG+:$log /TEE /NP
+robocopy $source $dest /E /COPY:DAT /DCOPY:DAT /Z /R:2 /W:5 /XO /XD "K:\DebianVm" "K:\System Volume Information" /LOG+:$log /TEE /NP
 
 Write-Host "`nRobocopy done. Check log for errors: $log"
 Write-Host "Verify contents on W:\K backup millcreek before ejecting K:."

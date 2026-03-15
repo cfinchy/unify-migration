@@ -13,6 +13,6 @@ Write-Host "Draining G: → $dest"
 Write-Host "⚠️  G: contains Bookworm/Bullseye DebianVM files"
 Write-Host "⚠️  NOTE IN MEMORY.MD: Test DebianVM from NAS before deleting G: copy"
 
-robocopy $source $dest /E /COPY:DAT /Z /R:2 /W:5 /XD "G:\System Volume Information" /LOG+:$log /TEE /NP
+robocopy $source $dest /E /COPY:DAT /DCOPY:DAT /Z /R:2 /W:5 /XD "G:\System Volume Information" /LOG+:$log /TEE /NP
 Write-Host "`nDone. Log: $log"
 Write-Host "Remember: DO NOT delete G:\DebianVm until VM has been tested from W:\DriveArchive\G\"

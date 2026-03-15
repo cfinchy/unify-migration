@@ -58,7 +58,7 @@ $InlineScript = @"
 `$pass = (Get-Content '$CredsFile' -Raw).Trim()
 net use '$Dest' `$pass /user:cfinchy 2>&1 | Out-Null
 New-Item -ItemType Directory -Path '$Dest' -Force | Out-Null
-robocopy '$Source' '$Dest' /E /COPYALL /Z /R:10 /W:30 /TS /NP /XD $XDirs /LOG+:'$Log'
+robocopy '$Source' '$Dest' /E /COPY:DAT /DCOPY:DAT /Z /R:10 /W:30 /TS /NP /XD $XDirs /LOG+:'$Log'
 "@
 
 $EncodedScript = [Convert]::ToBase64String(
