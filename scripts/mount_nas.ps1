@@ -1,36 +1,33 @@
-# mount_nas.ps1 — map W:/X: NAS shares for SSH-initiated scripts
-# Reads password from nas.creds (gitignored, must exist locally)
+# mount_nas.ps1 - map W:/X: NAS shares for SSH-initiated scripts
+# Reads password from nas.creds (gitignored, must exist locally at project root)
 # Dot-source this before any script that accesses W: or X:
-#   . "$PSScriptRoot\mount_nas.ps1"
-# Call Dismount-Nas at the end to clean up.
+#   . "$PSScriptRoot\mount_nas.ps1"; Mount-Nas
 
-$CredsFile = Join-Path (Split-Path $PSScriptRoot) "nas.creds"
-if (-not (Test-Path $CredsFile)) {
-    Write-Error "nas.creds not found at $CredsFile — create it with just the NAS password on one line"
-    exit 1
-}
-$NasPass = (Get-Content $CredsFile -Raw).Trim()
-$NasUser = "cfinchy"
-$NasHost = "192.168.0.124"
+$_CredsFile = "C:\projects\unify-migration\nas.creds"
 
 function Mount-Nas {
-    foreach ($map in @(
-        @{Letter="W"; Share="Personal-Drive"},
-        @{Letter="X"; Share="HABackups"}
-    )) {
-        $letter = $map.Letter + ":"
-        if (-not (Test-Path $letter)) {
-            net use $letter "\\$NasHost\$($map.Share)" $NasPass /user:$NasUser | Out-Null
-            Write-Host "Mounted $letter -> \\$NasHost\$($map.Share)"
-        } else {
-            Write-Host "$letter already mapped — skipping"
-        }
+    $pass = (Get-Content "C:\projects\unify-migration\nas.creds" -Raw).Trim()
+    if (-not (Test-Path "W:")) {
+        net use W: "\\192.168.0.124\Personal-Drive" $pass /user:cfinchy 2>&1 | Out-Null
+        Write-Host "Mounted W: -> \\192.168.0.124\Personal-Drive"
+    } else {
+        Write-Host "W: already mapped - skipping"
+    }
+    if (-not (Test-Path "X:")) {
+        net use X: "\\192.168.0.124\HABackups" $pass /user:cfinchy 2>&1 | Out-Null
+        Write-Host "Mounted X: -> \\192.168.0.124\HABackups"
+    } else {
+        Write-Host "X: already mapped - skipping"
     }
 }
 
 function Dismount-Nas {
-    foreach ($letter in @("W:", "X:")) {
-        net use $letter /delete /yes 2>$null | Out-Null
-    }
+    net use W: /delete /yes 2>&1 | Out-Null
+    net use X: /delete /yes 2>&1 | Out-Null
     Write-Host "NAS shares unmounted"
+}
+
+if (-not (Test-Path $_CredsFile)) {
+    Write-Error "nas.creds not found at $_CredsFile - create it with the NAS password on one line"
+    exit 1
 }
