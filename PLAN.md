@@ -71,12 +71,19 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  STA
   Confirm a backup exists on `X:\HABackups` dated ≤ 3 days ago. If stale, trigger a manual
   backup from https://millcreek.duckdns.org:8123 → Settings → Backup → Create.
 
-- [ ] **R2** — Inventory all Passport drives (size check, understand what's left):
+- [ ] **R2** — Audit NAS first (from home Proxmox VM — fast local I/O), then inventory source drives:
   ```bash
-  # K: inventory
-  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\inventory_k.ps1"
+  # 1. NAS audit — shows what's already on W:\ before any drain scripts run
+  #    Fast default (item counts); add MILLCREEK_SIZES=1 for GB figures (slow)
+  bash /tmp/unify-migration/scripts/millcreek-nas-audit.sh
+  # Report lands at: ~/.local/share/millcreek-audit/reports/nas-audit-<ts>.md
 
-  # Space summary for all drives
+  # 2. Source drive inventories (runs on Windows box via SSH)
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\inventory_k.ps1"
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\inventory_h.ps1"
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\inventory_g.ps1"
+
+  # 3. Space summary
   ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_space.ps1"
   ```
 
@@ -101,10 +108,13 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  STA
   ```
   ⚠️ Do NOT eject G: or delete local copy until verified on NAS from home (Step R6).
 
-- [ ] **R5** — Drain K: partial → NAS (drain_k.ps1 already excludes `K:\DebianVm\` — safe while HA is live):
+- [ ] **R5** — Drain K: partial → NAS (excludes `K:\DebianVm\` — safe while HA is live):
   ```bash
   ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\drain_k.ps1"
   ```
+  `drain_k.ps1` now targets `W:\K backup millcreek` (pre-existing manual backup) instead of a
+  new `DriveArchive\K`. Robocopy delta-syncs — only new/changed files cross the WAN. The `/XO`
+  flag prevents overwriting newer NAS files with potentially CRC-damaged K: data.
   **Do NOT eject K:** — the running HA VM lives at `K:\DebianVm\Bookworm\`. K: stays until Phase 3.
 
 - [ ] **R6** — Verify drain completeness from home Proxmox VM (fast local NAS I/O, no WAN):
