@@ -81,11 +81,15 @@ if ($isFirstRun) {
     }
 }
 
-# --- Check NAS reachability ---
+# --- Check NAS reachability (both UNC path and drive letters) ---
 $nasPath = "\\192.168.0.124\Personal-Drive"
-$nasOk = Test-Path $nasPath -ErrorAction SilentlyContinue
+$nasOk = (Test-Path $nasPath -ErrorAction SilentlyContinue) -and `
+         (Test-Path "W:" -ErrorAction SilentlyContinue) -and `
+         (Test-Path "X:" -ErrorAction SilentlyContinue) -and `
+         (Test-Path "Y:" -ErrorAction SilentlyContinue)
 
 if (-not $nasOk) {
+    WriteLog "NAS NOT READY - UNC: $(Test-Path $nasPath -EA SilentlyContinue), W: $(Test-Path W: -EA SilentlyContinue), X: $(Test-Path X: -EA SilentlyContinue), Y: $(Test-Path Y: -EA SilentlyContinue)"
     WriteLog "NAS UNREACHABLE - attempting remount"
     
     # Clear stale mounts
@@ -99,17 +103,19 @@ if (-not $nasOk) {
     Start-Sleep -Seconds 3
     
     # Check again
-    if (Test-Path $nasPath -ErrorAction SilentlyContinue) {
-        WriteLog "NAS: remounted successfully"
-        $nasOk = $true
+    $nasOk = (Test-Path $nasPath -ErrorAction SilentlyContinue) -and `
+             (Test-Path "W:" -ErrorAction SilentlyContinue)
+    
+    if ($nasOk) {
+        WriteLog "NAS: remounted successfully (W: $(Test-Path W: -EA SilentlyContinue), X: $(Test-Path X: -EA SilentlyContinue), Y: $(Test-Path Y: -EA SilentlyContinue))"
     } else {
         WriteLog "NAS: STILL UNREACHABLE after remount"
         if (-not $isFirstRun) {
-            SendAlert "CRITICAL: NAS Mount Failed" "Drain jobs may stall. Manual intervention needed."
+            SendAlert "CRITICAL: NAS Mount Failed" "Drive letters not accessible. Drain jobs will stall. Manual intervention needed."
         }
     }
 } else {
-    WriteLog "NAS: OK"
+    WriteLog "NAS: OK (all drives mounted)"
 }
 
 # --- Check drain tasks ---
