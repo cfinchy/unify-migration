@@ -123,19 +123,33 @@ Confirmed 2026-03-16: Millcreek HA is at `2026.3.1`, ahead of home HA (`2026.1.3
 
 ### Tier 2 — Next 2–3 Weeks (remote)
 
-#### 2a. Cross-instance presence sharing [ ]
+#### 2a. Cross-instance presence sharing [~] — partial, 2026-03-16
 
-When a family member's iCloud shows them at Millcreek zone, home HA should know.
+**What we found:** Home HA already fully tracks Watermill via iCloud3:
+`sensor.watermill_occupied`, per-person distances + direction-of-travel sensors.
+No webhooks needed for home HA to know who is at Watermill.
 
-Implementation: HA webhooks
-- Millcreek HA: automation on `person` state change → POST to home HA webhook
-- Home HA: automation with `webhook` trigger → update `input_boolean` or virtual sensor
+**Root cause on Millcreek:** `zone.home` was pointing at Collister (NYC) instead of
+the Watermill property. Millcreek HA was running AT Watermill but never registered
+anyone as "home" because the home zone was wrong.
 
-Steps:
-1. Create webhook ID on home HA: Settings → Automations → trigger: Webhook → note the ID
-2. Millcreek HA automation fires `rest_command` to `https://ha.fnchysan.uk/api/webhook/<id>`
-3. Repeat in reverse (home HA notifies Millcreek on departure)
-4. Create `zone.millcreek` on home HA at Millcreek coordinates
+**Fixed 2026-03-16:** Changed `zone.home` on Millcreek HA → Watermill coords
+(40.90546, -72.36152, 60m radius). Matches home HA's `zone.watermill` exactly.
+HA core restarted and verified.
+
+**Result:** Chris + Rene now auto-detected as `home` on Millcreek via existing iCloud.
+Existing automations (`proximity.home`, "Set temp on way to house", "Energy Saver
+lights off") now work correctly for Watermill. The "I'm home telegram" automation
+fires `notify.millcreek` when Chris arrives.
+
+**Remaining gap — Cameron & Mackenzie:** No device trackers on Millcreek HA.
+Home HA (iCloud3) does track them at Watermill. Need home HA → Millcreek webhook
+to inform Millcreek when they arrive/depart.
+
+- [ ] Create home HA automation: `sensor.watermill_cameron_distance < 0.1` → POST webhook to Millcreek
+- [ ] Create home HA automation: same for Mackenzie
+- [ ] Millcreek HA: webhook automation sets `input_boolean.cameron_at_watermill` / `mackenzie_at_watermill`
+- [ ] Add `chris` to Millcreek sudoers for `ha` commands (currently needs script workaround)
 
 #### 2b. Shared Lovelace views — DEFERRED (cleanup item)
 
@@ -204,7 +218,7 @@ as separate servers, switch with a tap. Full native experience, no auth wall.
 | Telegram on Millcreek | Already configured — Millcreek_bot valid, notify.millcreek exists | [x] 2026-03-16 |
 | Millcreek version | 2026.3.1 confirmed via SSH | [x] 2026-03-16 |
 | Home HA broken automations | Automation reloaded, marantz_source_test = unavailable | [x] 2026-03-15 |
-| Cross-instance presence | Manually trigger zone change → both HAs reflect it | [ ] |
+| Cross-instance presence | zone.home fixed → Chris+Rene auto-detected at Watermill | [~] Cameron/Mackenzie still need webhooks |
 | Lovelace / multi-server | Companion app multi-server setup (skip iframe) | [ ] deferred |
 | Notification script | Single script call → Telegram + mobile both receive | [ ] |
 
@@ -217,3 +231,4 @@ as separate servers, switch with a tap. Full native experience, no auth wall.
 | 2026-03-15 | Document created from audit session |
 | 2026-03-15 | Tier 1b complete: deleted marantz midnight test, fixed force_lg_tv_audio (TV=on condition), fixed block_unwanted_cec (off→on guard) |
 | 2026-03-16 | Tier 1a + 1c already done: Telegram (Millcreek_bot) and HA 2026.3.1 were pre-existing. SSH key auth set up, millcreek-ha alias added, credentials stored. |
+| 2026-03-16 | 2a partial: fixed zone.home on Millcreek HA → Watermill coords (was pointing at Collister). Chris+Rene now detected as home. Cameron/Mackenzie webhooks remain. |
