@@ -9,7 +9,7 @@ Write-Host "Registering monitoring tasks..."
 # Task 1: Quick health check (every 5 minutes)
 $action1 = New-ScheduledTaskAction -Execute "powershell.exe" `
     -Argument "-ExecutionPolicy Bypass -File $ProjectDir\scripts\quick_health_check.ps1"
-$trigger1 = New-ScheduledTaskTrigger -RepetitionInterval (New-TimeSpan -Minutes 5) `
+$trigger1 = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) `
     -RepetitionDuration (New-TimeSpan -Days 365)
 $settings1 = New-ScheduledTaskSettingsSet -StartWhenAvailable -DisallowDemandStart:$false
 
@@ -24,10 +24,10 @@ Register-ScheduledTask -Action $action1 -Trigger $trigger1 -Settings $settings1 
 
 Write-Host "✓ Task registered: UnifyMigration-QuickHealthCheck (every 5 min)"
 
-# Task 2: Full drain monitor (every 30 minutes) - if not already registered
+# Task 2: Full drain monitor (every 30 minutes)
 $action2 = New-ScheduledTaskAction -Execute "powershell.exe" `
     -Argument "-ExecutionPolicy Bypass -File $ProjectDir\scripts\monitor_drain.ps1"
-$trigger2 = New-ScheduledTaskTrigger -RepetitionInterval (New-TimeSpan -Minutes 30) `
+$trigger2 = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 30) `
     -RepetitionDuration (New-TimeSpan -Days 365)
 $settings2 = New-ScheduledTaskSettingsSet -StartWhenAvailable -DisallowDemandStart:$false
 
