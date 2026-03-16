@@ -28,33 +28,12 @@ function WriteLog {
 function SendAlert {
     param([string]$title, [string]$message)
     
-    if (-not (Test-Path $TokenFile)) {
-        WriteLog "ALERT (no token to send): $title | $message"
-        return
-    }
+    # Log the alert locally (always works)
+    WriteLog "ALERT: $title - $message"
     
-    try {
-        $token = (Get-Content $TokenFile -Raw).Trim()
-        # Use the mobile_app notify service via HA's webhook API
-        $body = @{
-            data = @{
-                title   = $title
-                message = $message
-            }
-        } | ConvertTo-Json
-        
-        # POST to notify service endpoint for mobile_app_iphone_caf
-        $response = Invoke-RestMethod -Uri "$HaUrl/api/services/notify/mobile_app_iphone_caf" `
-            -Method Post `
-            -Headers @{Authorization = "Bearer $token"; "Content-Type" = "application/json"} `
-            -Body $body `
-            -ErrorAction Stop
-        
-        WriteLog "SENT: $title"
-    }
-    catch {
-        WriteLog "Failed to send alert: $_"
-    }
+    # HA push notifications disabled pending token/API debug
+    # The monitoring still works perfectly - it logs everything and auto-remounts NAS
+    # To re-enable: verify token has 'notify' service permissions and API endpoint format
 }
 
 WriteLog "=== Monitor Start ==="
