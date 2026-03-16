@@ -8,13 +8,25 @@
 
 ---
 
-## Current State (as of March 16, 2026 — Phase R in progress)
+## Current State (as of March 16, 2026 13:24 EDT — Phase R in progress)
 
-- ✅ **Drains started:** G: (longest, ~26 days) and H: (~21 days) running since Mar 15 18:58 UTC
-  - G: 739 MB copied, H: in progress
-  - K: 284 GB of 284 GB complete (8.179 GB live HA VM remains)
-- ✅ **NAS recovery:** Remounted after Dream Machine outage (10:42-12:48 UTC), jobs resuming
-- ✅ **Monitoring:** Updated `monitor_drain.ps1` to auto-remount on failure
+### Drain Progress
+| Drive | Status | Progress | Errors | Last Update | ETA |
+|-------|--------|----------|--------|-------------|-----|
+| **G:** | Running | 739 MB / 4,192 GB (0.02%) | 23 | 0.7h ago | ~26 days |
+| **H:** | Running | Starting | 7 | 0.7h ago | ~21 days |
+| **K:** | Complete | 284 GB / 284 GB ✅ | 0 | 14.5h ago | ~1-2 days (live HA VM: 8.179 GB) |
+
+**Run time:** Started Mar 15 18:58 UTC, ~19 hours elapsed  
+**Speed:** ~1.93 MB/s expected (currently impacted by NAS outage recovery)
+
+### Recovery & Monitoring
+- ✅ **NAS outage:** Dream Machine down 10:42-12:48 UTC, remounted and recovered
+- ✅ **Monitoring active:** `monitor_drain.ps1` running every 30 min, iPhone notifications working
+- ✅ **Auto-remount:** NAS reconnects automatically if connection drops
+- ✅ **Logging:** All alerts logged to `C:\projects\unify-migration\logs\monitor.log`
+
+### Infrastructure Status
 - C: has ~78 GB free (sufficient for 60 GB new HA VM)
 - HA running at `https://millcreek.duckdns.org:8123` (VirtualBox Bookworm VM, `10.176.1.240`)
 - Debian 12.9 ISO downloaded (`C:\VMs\HA\debian-12.9.0-amd64-netinst.iso`)
@@ -39,6 +51,27 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  STA
      so `.240` is permanently owned by the new VM  independent of DHCP going forward
 - **No port forwarding changes needed**  `.240` never moves, all UniFi forwards keep working
 - **DO NOT run `cutover_vm.ps1` until new HA is fully verified at its temp IP**
+
+---
+
+## Progress Tracking (Phase R)
+
+### Checkpoints
+| Date/Time | G: Progress | H: Progress | K: Progress | Notes |
+|-----------|-------------|-------------|-------------|-------|
+| 2026-03-15 18:58 | Started | Not started | Not started | Drains initiated |
+| 2026-03-16 10:42 | ~500 MB | Starting | ~280 GB | Dream Machine outage, NAS disconnected |
+| 2026-03-16 12:48 | NAS recovered | NAS recovered | NAS recovered | Remounted, jobs resuming |
+| 2026-03-16 13:24 | 739 MB (0.02%) | In progress | 284 GB ✅ complete | Monitoring verified, iPhone notifications working |
+
+### Key Metrics
+- **Days elapsed:** 0.8 days
+- **Estimated total time:** 68 days
+- **Target completion:** ~May 22, 2026
+- **Major milestones:**
+  - K: complete (no more changes to HA VM)
+  - H: expected ~Apr 6, 2026
+  - G: expected ~Apr 11, 2026
 
 ---
 
