@@ -8,16 +8,16 @@
 
 ---
 
-## Current State (as of March 14, 2026)
+## Current State (as of March 16, 2026 — Phase R in progress)
 
--  C: freed from 17 GB  ~76 GB (Bond collection deleted, ISOs deleted)
--  HA running at `https://millcreek.duckdns.org:8123` (VirtualBox Bookworm VM, `10.176.1.240`)
--  NAS (`192.168.0.124`) reachable, SMB shares mapped as W:/X:/Y:
--  HA backup completed Mar 14  `9ff1dfa6.tar` (4.91 GB) on `X:\HABackups`
--  Debian 12.9 ISO downloaded  `C:\VMs\HA\debian-12.9.0-amd64-netinst.iso`
--  Bookworm VM (HA) lives entirely on K: (`K:\DebianVm\Bookworm\`)  1.6 TB of snapshot chain
--  K: drive has prior CRC errors  data at risk
--  Windows Explorer restarting intermittently  monitor
+- ✅ **Drains started:** G: (longest, ~26 days) and H: (~21 days) running since Mar 15 18:58 UTC
+  - G: 739 MB copied, H: in progress
+  - K: 284 GB of 284 GB complete (8.179 GB live HA VM remains)
+- ✅ **NAS recovery:** Remounted after Dream Machine outage (10:42-12:48 UTC), jobs resuming
+- ✅ **Monitoring:** Updated `monitor_drain.ps1` to auto-remount on failure
+- C: has ~78 GB free (sufficient for 60 GB new HA VM)
+- HA running at `https://millcreek.duckdns.org:8123` (VirtualBox Bookworm VM, `10.176.1.240`)
+- Debian 12.9 ISO downloaded (`C:\VMs\HA\debian-12.9.0-amd64-netinst.iso`)
 
 ---
 
@@ -39,6 +39,37 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  STA
      so `.240` is permanently owned by the new VM  independent of DHCP going forward
 - **No port forwarding changes needed**  `.240` never moves, all UniFi forwards keep working
 - **DO NOT run `cutover_vm.ps1` until new HA is fully verified at its temp IP**
+
+---
+
+## Monitoring Setup (Phase R)
+
+### Quick Reference
+
+| Task | Command | When to Run |
+|------|---------|------------|
+| **Check status** | `ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_drain.ps1"` | Anytime (5 sec) |
+| **View monitor log** | `ssh millcreek-win "Get-Content C:\projects\unify-migration\logs\monitor.log -Tail 50"` | After issues |
+| **Remount NAS** | `ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\mount_nas.ps1"` | If NAS unreachable |
+| **Set up auto-monitor** | `ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\start_monitor.ps1"` | Once, at beginning |
+
+### Why Monitoring Matters
+
+The drain jobs run for **~70 days total**. The NAS mount can disconnect due to:
+- Network blips (Dream Machine restarts, router resets)
+- SMB session timeouts
+- Power events on NAS
+
+**Without monitoring:** You won't know mount died until days later when you manually check.
+
+**With `monitor_drain.ps1`:** Every 30 min it:
+1. Pings NAS (`192.168.0.124`)
+2. If unreachable → auto-remount (clears stale SMB session)
+3. Checks each drain task for errors/stalls
+4. Sends push notifications on problems
+5. Logs everything to `monitor.log`
+
+**Robocopy's retry logic:** Jobs have built-in 30-sec retry on network errors, so even without monitoring they'll eventually resume. Monitoring just means you **know** when it happens and can intervene faster if needed.
 
 ---
 
@@ -113,23 +144,49 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  STA
   `/XO` flag prevents overwriting newer NAS copies with CRC-damaged K: source files.
   **Do NOT eject K:** — the running HA VM lives at `K:\DebianVm\Bookworm\`. K: stays until Phase 3.
 
-- [ ] **R6** — Check drain progress (run from home at any time — zero effect on the drain):
+- [ ] **R6** — Set up automated monitoring (optional but recommended for long job):
+  
+  **Option A: Passive checking (manual, always works)**
   ```bash
+  # Check drain status anytime from home
   ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_drain.ps1"
   ```
-  Shows: Task Scheduler state, robocopy log tail, files/bytes copied, errors, active processes.
-  To tail a log live: `ssh millcreek-win "powershell -Command \"Get-Content C:\projects\unify-migration\logs\drain_g.log -Wait -Tail 20\""`
-
-  Verify on NAS from home after each drive completes:
+  Shows: Task state, robocopy progress, error count, last log update time, active processes.
+  
+  **Option B: Automated monitoring every 30 min (sends push notifications)**
   ```bash
-  ls /mnt/nas/Personal-Drive/DriveArchive/    # G: and H: destinations
-  ls /mnt/nas/Personal-Drive/K\ backup\ millcreek/   # K: destination
+  # First time only: register the monitor task
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\start_monitor.ps1"
+  ```
+  This will:
+  - Run `monitor_drain.ps1` every 30 minutes
+  - Check if NAS is reachable
+  - Auto-remount if connection drops
+  - Send push notifications to your iPhone on problems (NAS unreachable, task stalled, new errors)
+  - Log everything to `C:\projects\unify-migration\logs\monitor.log`
+  
+  **After setup:** Just check the log occasionally:
+  ```bash
+  ssh millcreek-win "Get-Content -Path C:\projects\unify-migration\logs\monitor.log -Tail 20"
   ```
 
-- [ ] **R7** — Monitor HA health weekly (repeat throughout 4-week window):
+- [ ] **R7** — Verify NAS after each drive completes (from home):
+  ```bash
+  # Check what's been transferred
+  ssh docker-host "ls -lh /mnt/nas/Personal-Drive/DriveArchive/"     # G: and H: destinations
+  ssh docker-host "ls -lh /mnt/nas/Personal-Drive/K\ backup\ millcreek/" | tail -20  # K: destination
+  ```
+
+- [ ] **R8** — Monitor HA health weekly (repeat throughout 4-week window):
   ```bash
   ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_backup.ps1"
   # Also verify HA web UI: https://millcreek.duckdns.org:8123
+  ```
+  
+  **If NAS goes down again (detected via monitor log or manual check):**
+  ```bash
+  # Remount immediately — drain jobs will resume
+  ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\mount_nas.ps1"
   ```
 
 ---
