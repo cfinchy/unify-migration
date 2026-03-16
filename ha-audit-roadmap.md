@@ -35,9 +35,9 @@ they currently fail to communicate, and what improvements to prioritise.
 - Notifications: Telegram bot (chat_id 1785328480) + mobile_app_iphone_caf
 
 **Known broken automations (from 2026-03-11 audit):**
-- [ ] `1705882864243` — Marantz source test runs at midnight daily → **delete**
-- [ ] `1700000003` — `force_lg_tv_audio` fires when TV off → add `state: 'on'` condition
-- [ ] `1700000005` — `block_unwanted_cec` template warning on off→on transition → add guard
+- [x] `1705882864243` — Marantz source test runs at midnight daily → deleted 2026-03-15
+- [x] `1700000003` — `force_lg_tv_audio` fires when TV off → `state: 'on'` condition added 2026-03-15
+- [x] `1700000005` — `block_unwanted_cec` template warning on off→on transition → guard added 2026-03-15
 
 **Other known issues:**
 - Level Lock Alexa Smart Home routine actions broken (March 2026 Amazon outage)
@@ -127,7 +127,7 @@ notify:
 - Millcreek HA config accessible via File Editor add-on or SSH add-on
 - Verification: trigger a test notification from Millcreek → message in same Telegram chat
 
-#### 1b. Fix home HA broken automations [ ]
+#### 1b. Fix home HA broken automations [x] — 2026-03-15
 
 - [ ] Delete `1705882864243` (Marantz midnight source test — running in production)
 - [ ] Fix `1700000003`: add condition `state: media_player.lg_webos_tv_oled77g3pua == 'on'`
@@ -227,7 +227,7 @@ Steps:
 |------|------|--------|
 | Telegram on Millcreek | Trigger test notification → arrives in same chat | [ ] |
 | Millcreek version | `curl .../api/` returns `2026.x.x` | [ ] |
-| Home HA broken automations | Confirm deleted/fixed in UI | [ ] |
+| Home HA broken automations | Automation reloaded, marantz_source_test = unavailable | [x] 2026-03-15 |
 | Cross-instance presence | Manually trigger zone change → both HAs reflect it | [ ] |
 | Lovelace iframe | Home HA → Millcreek panel loads | [ ] |
 | Notification script | Single script call → Telegram + mobile both receive | [ ] |
@@ -239,3 +239,4 @@ Steps:
 | Date | Change |
 |------|--------|
 | 2026-03-15 | Document created from audit session |
+| 2026-03-15 | Tier 1b complete: deleted marantz midnight test, fixed force_lg_tv_audio (TV=on condition), fixed block_unwanted_cec (off→on guard) |
