@@ -31,3 +31,6 @@ if (-not (Test-Path $_CredsFile)) {
     Write-Error "nas.creds not found at $_CredsFile - create it with the NAS password on one line"
     exit 1
 }
+
+# Execute the mount
+Mount-Nas
