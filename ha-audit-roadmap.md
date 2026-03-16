@@ -50,24 +50,28 @@ they currently fail to communicate, and what improvements to prioritise.
 
 | Property | Value |
 |----------|-------|
-| Version | **2025.7.1** (~6 months behind as of March 2026) |
+| Version | **2026.3.1** (confirmed 2026-03-16, ahead of home HA) |
 | Host | Debian Bookworm VM on VirtualBox, `K:\DebianVm\Bookworm` |
 | Internal IP | `10.176.1.240` |
+| SSH alias | `millcreek-ha` (ProxyJump via `millcreek-win`) |
+| HA config | `/usr/share/hassio/homeassistant/` |
 | Status | Phase 2 migration deferred to physical visit |
 | Backups | `X:\HABackups` on home NAS |
 
 **Confirmed integrations:**
 - Alexa Media Player: ~40 Alexa devices (Echo, Echo Dot, Echo Show, Sonos, Brilliant)
 - Mobile App: iphone_chris, iphone_chris_2, iphone_caf, ipad_pro, renes_iphone
+- Telegram: `Millcreek_bot` (token hardcoded in configuration.yaml), `notify.millcreek`, chat_id 1785328480
+- PlateRecognizer, doods object detection, camera integrations
+- Lutron Caseta, Ring, MQTT/Shelly sensors, Govee lights
 - Custom Lovelace dashboard at `/lovelace-millcreek/page-1`
 
 **Gaps vs home HA:**
-- [ ] No Telegram notification channel (mobile push only)
 - [ ] No confirmed presence tracking
-- [ ] No confirmed climate/thermostat integration
-- [ ] No confirmed security camera integration
+- [ ] No confirmed climate/thermostat integration (Nest config commented out)
 - [ ] Unknown automation count (API access needs fresh long-lived token)
 - [ ] No AI assist integration confirmed
+- [ ] Telegram token hardcoded in configuration.yaml (should move to secrets.yaml)
 
 **To get API access:**
 1. Go to `https://millcreek.duckdns.org` → profile avatar → Security → Long-lived access tokens → Create
@@ -96,36 +100,13 @@ devices on two physically separate networks without cloud bridges for everything
 
 ### Tier 1 — Do This Week (remote, no physical visit needed)
 
-#### 1a. Add Telegram to Millcreek HA [ ]
+#### 1a. Add Telegram to Millcreek HA [x] — already configured
 
-Same bot token and chat_id as home HA so alerts land in the same family chat.
-
-Add to Millcreek HA `configuration.yaml`:
-```yaml
-telegram_bot:
-  - platform: polling
-    api_key: !secret telegram_api_key
-    allowed_chat_ids:
-      - !secret telegram_chat_id
-```
-
-Add `secrets.yaml` entries (same values as home HA):
-```yaml
-telegram_api_key: "7631285954:AAH..."
-telegram_chat_id: "1785328480"
-```
-
-Add to `notify.yaml` (or `configuration.yaml` notify section):
-```yaml
-notify:
-  - platform: telegram
-    name: home
-    chat_id: !secret telegram_chat_id
-```
-
-- Update drain monitor and other automations to use `notify.telegram_home`
-- Millcreek HA config accessible via File Editor add-on or SSH add-on
-- Verification: trigger a test notification from Millcreek → message in same Telegram chat
+Found on 2026-03-16: Telegram was already set up in `configuration.yaml`.
+- Bot: `Millcreek_bot` (different token from home HA bot, both valid)
+- Notify service: `notify.millcreek`
+- Same chat_id: `1785328480` — alerts land in the same Telegram chat
+- **Remaining**: Move token from hardcoded in configuration.yaml to `secrets.yaml`
 
 #### 1b. Fix home HA broken automations [x] — 2026-03-15
 
@@ -134,12 +115,9 @@ notify:
 - [ ] Fix `1700000005`: add guard for off→on transition to suppress template warning
 - Access: `http://192.168.0.98:8123` → Settings → Automations
 
-#### 1c. Update Millcreek HA version [ ]
+#### 1c. Update Millcreek HA version [x] — already on 2026.3.1
 
-- Current: 2025.7.1 → Target: 2026.1.x (match home HA)
-- Steps: take backup first → HA UI → Settings → Updates → Install
-- Risk: low on a clean install; if update breaks the VM, requires physical visit
-- Verification: `curl https://millcreek.duckdns.org/api/ -H "Authorization: Bearer $TOKEN"`
+Confirmed 2026-03-16: Millcreek HA is at `2026.3.1`, ahead of home HA (`2026.1.3`).
 
 ---
 
@@ -225,8 +203,8 @@ Steps:
 
 | Item | Test | Status |
 |------|------|--------|
-| Telegram on Millcreek | Trigger test notification → arrives in same chat | [ ] |
-| Millcreek version | `curl .../api/` returns `2026.x.x` | [ ] |
+| Telegram on Millcreek | Already configured — Millcreek_bot valid, notify.millcreek exists | [x] 2026-03-16 |
+| Millcreek version | 2026.3.1 confirmed via SSH | [x] 2026-03-16 |
 | Home HA broken automations | Automation reloaded, marantz_source_test = unavailable | [x] 2026-03-15 |
 | Cross-instance presence | Manually trigger zone change → both HAs reflect it | [ ] |
 | Lovelace iframe | Home HA → Millcreek panel loads | [ ] |
@@ -240,3 +218,4 @@ Steps:
 |------|--------|
 | 2026-03-15 | Document created from audit session |
 | 2026-03-15 | Tier 1b complete: deleted marantz midnight test, fixed force_lg_tv_audio (TV=on condition), fixed block_unwanted_cec (off→on guard) |
+| 2026-03-16 | Tier 1a + 1c already done: Telegram (Millcreek_bot) and HA 2026.3.1 were pre-existing. SSH key auth set up, millcreek-ha alias added, credentials stored. |
