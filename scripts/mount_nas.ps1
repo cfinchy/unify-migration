@@ -19,6 +19,12 @@ function Mount-Nas {
     } else {
         Write-Host "X: already mapped - skipping"
     }
+    if (-not (Test-Path "Y:")) {
+        net use Y: "\\192.168.0.124\Personal-Drive" $pass /user:cfinchy 2>&1 | Out-Null
+        Write-Host "Mounted Y: -> \\192.168.0.124\Personal-Drive"
+    } else {
+        Write-Host "Y: already mapped - skipping"
+    }
 }
 
 function Dismount-Nas {
