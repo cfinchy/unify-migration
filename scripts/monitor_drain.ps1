@@ -24,7 +24,7 @@ function WriteLog {
     Add-Content -Path $MonitorLog -Value $line
 }
 
-# Send notification to home HA
+# Send notification to home HA mobile app
 function SendAlert {
     param([string]$title, [string]$message)
     
@@ -35,16 +35,16 @@ function SendAlert {
     
     try {
         $token = (Get-Content $TokenFile -Raw).Trim()
+        # Use the mobile_app notify service via HA's webhook API
         $body = @{
-            type    = "notify"
-            service = $NotifyService
-            data    = @{
+            data = @{
                 title   = $title
                 message = $message
             }
         } | ConvertTo-Json
         
-        $response = Invoke-RestMethod -Uri "$HaUrl/api/services/notify/send_message" `
+        # POST to notify service endpoint for mobile_app_iphone_caf
+        $response = Invoke-RestMethod -Uri "$HaUrl/api/services/notify/mobile_app_iphone_caf" `
             -Method Post `
             -Headers @{Authorization = "Bearer $token"; "Content-Type" = "application/json"} `
             -Body $body `
