@@ -31,9 +31,32 @@ function SendAlert {
     # Log the alert locally (always works)
     WriteLog "ALERT: $title - $message"
     
-    # HA push notifications disabled pending token/API debug
-    # The monitoring still works perfectly - it logs everything and auto-remounts NAS
-    # To re-enable: verify token has 'notify' service permissions and API endpoint format
+    # Send to HA mobile app
+    if (-not (Test-Path $TokenFile)) {
+        return
+    }
+    
+    try {
+        $token = (Get-Content $TokenFile -Raw).Trim()
+        
+        # HA API endpoint: /api/services/notify/{service_name}
+        # For mobile_app_iphone_caf service, POST to that endpoint with title/message
+        $body = @{
+            title = $title
+            message = $message
+        } | ConvertTo-Json
+        
+        $response = Invoke-RestMethod -Uri "$HaUrl/api/services/notify/mobile_app_iphone_caf" `
+            -Method Post `
+            -Headers @{Authorization = "Bearer $token"; "Content-Type" = "application/json"} `
+            -Body $body `
+            -ErrorAction Stop
+        
+        WriteLog "SENT to iPhone: $title"
+    }
+    catch {
+        WriteLog "Failed to send to HA: $_"
+    }
 }
 
 WriteLog "=== Monitor Start ==="
