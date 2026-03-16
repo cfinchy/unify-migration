@@ -137,19 +137,17 @@ Steps:
 3. Repeat in reverse (home HA notifies Millcreek on departure)
 4. Create `zone.millcreek` on home HA at Millcreek coordinates
 
-#### 2b. Shared Lovelace views [ ]
+#### 2b. Shared Lovelace views — DEFERRED (cleanup item)
 
-- Add Millcreek panel to home HA frontend using `panel_iframe`:
-  ```yaml
-  panel_iframe:
-    millcreek:
-      title: Millcreek
-      url: https://millcreek.duckdns.org/lovelace-millcreek/page-1
-      icon: mdi:home-map-marker
-  ```
-- Add home HA panel to Millcreek frontend similarly
-- Enables monitoring both properties from one UI
-- Note: will prompt for login if sessions aren't shared (expected, different instances)
+`panel_iframe` works on desktop browser (one login required, then persistent) but
+breaks on the Companion app — webview doesn't share cookies, auth wall hits every
+time, interactive elements unreliable.
+
+**Better approach for mobile: Companion app multi-server** — add both HA instances
+as separate servers, switch with a tap. Full native experience, no auth wall.
+
+- [ ] Set up multi-server on Companion app (Settings → Companion app → Add server → `millcreek.duckdns.org`)
+- [ ] Skip `panel_iframe` unless desktop-only use case arises
 
 #### 2c. Cross-instance notification routing [ ]
 
@@ -207,7 +205,7 @@ Steps:
 | Millcreek version | 2026.3.1 confirmed via SSH | [x] 2026-03-16 |
 | Home HA broken automations | Automation reloaded, marantz_source_test = unavailable | [x] 2026-03-15 |
 | Cross-instance presence | Manually trigger zone change → both HAs reflect it | [ ] |
-| Lovelace iframe | Home HA → Millcreek panel loads | [ ] |
+| Lovelace / multi-server | Companion app multi-server setup (skip iframe) | [ ] deferred |
 | Notification script | Single script call → Telegram + mobile both receive | [ ] |
 
 ---
