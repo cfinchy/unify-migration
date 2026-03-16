@@ -22,7 +22,7 @@ Register-ScheduledTask -Action $action1 -Trigger $trigger1 -Settings $settings1 
     -TaskName "UnifyMigration-QuickHealthCheck" `
     -Description "Quick NAS mount check - every 5 minutes" -Force | Out-Null
 
-Write-Host "✓ Task registered: UnifyMigration-QuickHealthCheck (every 5 min)"
+Write-Host "[OK] Task registered: UnifyMigration-QuickHealthCheck (every 5 min)"
 
 # Task 2: Full drain monitor (every 30 minutes)
 $action2 = New-ScheduledTaskAction -Execute "powershell.exe" `
@@ -40,7 +40,7 @@ Register-ScheduledTask -Action $action2 -Trigger $trigger2 -Settings $settings2 
     -TaskName "UnifyMigration-Monitor" `
     -Description "Drain job monitor - every 30 minutes" -Force | Out-Null
 
-Write-Host "✓ Task registered: UnifyMigration-Monitor (every 30 min)"
+Write-Host "[OK] Task registered: UnifyMigration-Monitor (every 30 min)"
 
 Write-Host ""
 Write-Host "Monitoring is now active:"
