@@ -75,34 +75,52 @@ New VM (HomeAssistant-C, C:, TEMP MAC, random IP)  install  verify  cutover  STA
 
 ---
 
-## Monitoring Setup (Phase R)
+## Monitoring Setup (Phase R) — Dual-Tier System
 
-### Quick Reference
+### Architecture
 
-| Task | Command | When to Run |
-|------|---------|------------|
-| **Check status** | `ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_drain.ps1"` | Anytime (5 sec) |
-| **View monitor log** | `ssh millcreek-win "Get-Content C:\projects\unify-migration\logs\monitor.log -Tail 50"` | After issues |
-| **Remount NAS** | `ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\mount_nas.ps1"` | If NAS unreachable |
-| **Set up auto-monitor** | `ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\start_monitor.ps1"` | Once, at beginning |
+**Tier 1: Quick Health Check** (every 5 minutes)
+- Fast test of W:, X:, Y: drive letters
+- Auto-remounts if disconnected
+- No alerts, no overhead
+- **Catches mount failures in ~5 minutes** (vs 30 min with just full monitor)
 
-### Why Monitoring Matters
+**Tier 2: Full Drain Monitor** (every 30 minutes)
+- Detailed drain task status
+- Error/stall detection
+- iPhone notifications on problems
+- Logs to `monitor.log`
 
-The drain jobs run for **~70 days total**. The NAS mount can disconnect due to:
-- Network blips (Dream Machine restarts, router resets)
-- SMB session timeouts
-- Power events on NAS
+### Current Status
 
-**Without monitoring:** You won't know mount died until days later when you manually check.
+```
+✓ UnifyMigration-QuickHealthCheck  (every 5 min)
+✓ UnifyMigration-Monitor           (every 30 min)
+✓ UnifyMigration-DrainG            (running)
+✓ UnifyMigration-DrainH            (running)
+✓ UnifyMigration-DrainK            (complete, ready)
+```
 
-**With `monitor_drain.ps1`:** Every 30 min it:
-1. Pings NAS (`192.168.0.124`)
-2. If unreachable → auto-remount (clears stale SMB session)
-3. Checks each drain task for errors/stalls
-4. Sends push notifications on problems
-5. Logs everything to `monitor.log`
+### Manual Commands
 
-**Robocopy's retry logic:** Jobs have built-in 30-sec retry on network errors, so even without monitoring they'll eventually resume. Monitoring just means you **know** when it happens and can intervene faster if needed.
+| Task | Command |
+|------|---------|
+| **Check drain status** | `ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\check_drain.ps1"` |
+| **View quick health log** | `ssh millcreek-win "Get-Content C:\projects\unify-migration\logs\health_check.log -Tail 30"` |
+| **View full monitor log** | `ssh millcreek-win "Get-Content C:\projects\unify-migration\logs\monitor.log -Tail 50"` |
+| **Manual remount** | `ssh millcreek-win "powershell -ExecutionPolicy Bypass -File C:\projects\unify-migration\scripts\mount_nas.ps1"` |
+
+### Why This Works
+
+The drain jobs stalled for **3.6 hours** when NAS went down (13:29-17:01) because:
+- Original 30-min monitor missed the failure for too long
+- SMB connections timeout/drop for various reasons
+
+**Dual-tier approach:**
+- **5-min quick check** catches issues before they kill drains
+- **30-min full monitor** handles alerting and detailed logging
+- **Auto-remount** keeps connections alive without human intervention
+- **iPhone alerts** notify you of persistent problems
 
 ---
 
